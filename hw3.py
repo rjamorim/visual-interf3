@@ -4,6 +4,7 @@
 import cv2, cv
 import numpy as np
 
+# Array that holds characteristics for the campus buildings
 charact = []
 
 image = cv2.imread("ass3-labeled.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
@@ -80,13 +81,14 @@ def squarest(shapes):
         if shape[4] != 0:
             ma = float(max(shape[1][2], shape[1][3]))
             mi = float(min(shape[1][2], shape[1][3]))
+            # The squarest building is the one with smallest ratio height/width
             if ma / mi < most:
                 most = ma / mi
                 building = shape[0]
     return building
 
 
-# Here we detect which shape is the squarest
+# Here we detect which shape is the most rectangular
 def mostrectangular(shapes):
     most = 0.0
     building = 0
@@ -95,6 +97,7 @@ def mostrectangular(shapes):
         if shape[4] != 0:
             ma = float(max(shape[1][2], shape[1][3]))
             mi = float(min(shape[1][2], shape[1][3]))
+            # The most rectangular building is the one with largest ratio height/width
             if ma / mi > most:
                 most = ma / mi
                 building = shape[0]
@@ -177,11 +180,12 @@ def areaclust(shapes):
 
 
 # Here we detect whether the shape is "quadrilateral-ish", that is, approaches a rectangle;
-# or with substantial negative space
+# or if it contains substantial negative space in the mbr
 def quadrilateral(mbr, shape):
     flag = 0
     area_shape = cv2.contourArea(shape)
     area_mbr = mbr[2] * mbr[3]
+    # I decided on values of 1.25 and lower for the areas ratio as a good approximation for a rectangular shape
     if ( area_mbr / area_shape ) < 1.26:
         flag = 1
     return flag
@@ -193,17 +197,12 @@ for array in contours[0]:
     # Here we get the color (index):
     color = image[array[0][0][1]][array[0][0][0]]
 
-    # Here we obtain the minimum bounding rectangles
+    # Here we obtain the minimum bounding rectangle
     x, y, w, h = cv2.boundingRect(array)
-
-    #print names[color]
-    #print (float(max(w, h)) / float(min(w, h)))
-    #print w
-    #print h
 
     quadr = quadrilateral((x, y, w, h), array)
 
-    # Here we find the area of each shape
+    # Here we find the area of the shape
     area = int(cv2.contourArea(array))
 
     # And here the center of mass
@@ -213,6 +212,7 @@ for array in contours[0]:
         cy = int(moments['m01']/moments['m00'])  # cy = M01/M00
     center = (cx, cy)
 
+    # All values are added to an array that will be used elsewhere in the program
     shapes.append([color, (x, y, w, h), area, center, quadr])
 
     #cv2.circle(image, center, 3, 128, 1)
