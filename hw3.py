@@ -158,7 +158,9 @@ def thinnest(shapes):
 def lettershape(shape):
     # Method that returns the amount of sides in the shape polygon
     poly = cv2.approxPolyDP(shape, 0.009*cv2.arcLength(shape, True), True)
+    # Method that calculates the convex hull of the shape
     hull = cv2.convexHull(shape, returnPoints=False)
+    # Method that identifies each convexity defect in the hull
     defects = cv2.convexityDefects(shape, hull)
     point = 0
     try:
@@ -266,6 +268,40 @@ def areaclust(shapes):
         i += 1
 
 
+# Here we detect if there is horizontal symmetry
+def hsymmetry(roi):
+    if len(roi) % 2 == 0:
+        fsthalf = roi[0:len(roi)/2, :]
+        sndhalf = roi[len(roi)/2:, :]
+        cv2.flip(sndhalf.copy(), 0, sndhalf)
+        if fsthalf.__eq__(sndhalf).all():
+            return "horizontally simmetrical"
+    else:
+        fsthalf = roi[0:len(roi)/2, :]
+        sndhalf = roi[(len(roi)/2)+1:, :]
+        cv2.flip(sndhalf.copy(), 0, sndhalf)
+        if fsthalf.__eq__(sndhalf).all():
+            return "horizontally simmetrical"
+    return None
+
+
+# Here we detect if there is vertical symmetry
+def vsymmetry(roi):
+    if len(roi[0]) % 2 == 0:
+        fsthalf = roi[:, 0:len(roi[0])/2]
+        sndhalf = roi[:, len(roi[0])/2:]
+        cv2.flip(sndhalf.copy(), 1, sndhalf)
+        if fsthalf.__eq__(sndhalf).all():
+            return "vertically simmetrical"
+    else:
+        fsthalf = roi[:, 0:len(roi[0])/2]
+        sndhalf = roi[:, (len(roi[0])/2)+1:]
+        cv2.flip(sndhalf.copy(), 1, sndhalf)
+        if fsthalf.__eq__(sndhalf).all():
+            return "vertically simmetrical"
+    return None
+
+
 # Here we detect whether the shape is "quadrilateral-ish", that is, approaches a rectangle;
 # or if it contains substantial negative space in the mbr
 def quadrilateral(mbr, shape):
@@ -284,14 +320,28 @@ shapes = []
 for shape in contours[0]:
     # Here we get the color (index):
     color = image[shape[0][0][1]][shape[0][0][0]]
+    print "== " + names[color]
 
     # Here we obtain the minimum bounding rectangle
     x, y, w, h = cv2.boundingRect(shape)
 
-    print names[color]
+    # We use the MBR to extract the shape as a roi
+    roi = image[y:y+h, x:x+w]
+    # Sometimes a part of a building gets into the MBR we're working with. This line removes this intrusion:
+    roi[roi != color] = 0
+
+    # Does the shape approach a quadrilateral or nah?
     quadr = quadrilateral((w, h), shape)
     if quadr:
         charact.append([color, orientation((w, h))])
+
+    # Is the shape horizontally symmetric? And Vertically?
+    hsymm = hsymmetry(roi)
+    if hsymm:
+        charact.append([color, hsymm])
+    vsymm = vsymmetry(roi)
+    if vsymm:
+        charact.append([color, vsymm])
 
     # Here we find the area of the shape
     area = int(cv2.contourArea(shape))
@@ -318,7 +368,6 @@ for shape in contours[0]:
     # All values are added to an array that will be used elsewhere in the program
     shapes.append([color, (x, y, w, h), area, center, quadr])
 
-
     #cv2.circle(image, center, 3, 128, -1)
 
 charact.append([northernmost(shapes), "northernmost building"])
@@ -332,6 +381,7 @@ charact.append([smallest(shapes), "smallest building"])
 charact.append([longest(shapes), "longest building"])
 charact.append([thinnest(shapes), "thinnest building"])
 areaclust(shapes)
+
 
 #for character in charact:
 #    print names[character[0]] + ": " + character[1]
