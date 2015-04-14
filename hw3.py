@@ -2,13 +2,14 @@
 # Roberto Amorim - rja2139
 
 import cv2, cv
+import time
 import numpy as np
 
 # Array that holds characteristics for the campus buildings
 charact = []
 
 image = cv2.imread("ass3-labeled.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
-#image = cv2.imread("ass3-campus.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
+display = cv2.imread("ass3-campus.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
 contours = cv2.findContours(image.copy(), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_NONE)
 
 # Here we open the building names table
@@ -207,23 +208,23 @@ def geoposition(c):
     ythird = width / 3
     xthird = height / 3
     if c[0] < xthird and c[1] < ythird:
-        return "Building position: northwest"
+        return "building position: northwest"
     elif c[0] > xthird and c[0] < xthird*2 and c[1] < ythird:
-        return "Building position: north"
+        return "building position: north"
     elif c[0] > xthird*2 and c[1] < ythird:
-        return "Building position: northeast"
+        return "building position: northeast"
     elif c[0] < xthird and c[1] > ythird and c[1] < ythird*2:
-        return "Building position: west"
+        return "building position: west"
     elif c[0] > xthird and c[0] < xthird*2 and c[1] > ythird and c[1] < ythird*2:
-        return "Building position: center"
+        return "building position: center"
     elif c[0] > xthird*2 and c[1] > ythird and c[1] < ythird*2:
-        return "Building position: east"
+        return "building position: east"
     elif c[0] < xthird and c[1] > ythird*2:
-        return "Building position: southwest"
+        return "building position: southwest"
     elif c[0] > xthird and c[0] < xthird*2 and c[1] > ythird*2:
-        return "Building position: south"
+        return "building position: south"
     elif c[0] > xthird*2 and c[1] < ythird*2:
-        return "Building position: southeast"
+        return "building position: southeast"
     else:
         return None
 
@@ -238,9 +239,9 @@ def orientation(dimen):
         return None
     else:
         if dimen[0] > dimen[1]:
-            return "Oriented east-west (horizontal)"
+            return "oriented east-west (horizontal)"
         else:
-            return "Oriented north-south (vertical)"
+            return "oriented north-south (vertical)"
 
 
 # Here we cluster areas to decide which shapes are "small", "medium" and "large"
@@ -320,7 +321,7 @@ shapes = []
 for shape in contours[0]:
     # Here we get the color (index):
     color = image[shape[0][0][1]][shape[0][0][0]]
-    print "== " + names[color]
+    #print "== " + names[color]
 
     # Here we obtain the minimum bounding rectangle
     x, y, w, h = cv2.boundingRect(shape)
@@ -383,8 +384,48 @@ charact.append([thinnest(shapes), "thinnest building"])
 areaclust(shapes)
 
 
-#for character in charact:
-#    print names[character[0]] + ": " + character[1]
+# User interface code
+cv2.imshow('campus', display)
 
-#cv2.imshow('campus', image)
-#cv2.waitKey(0)
+frame = np.zeros((495, 700, 3), np.uint8)
+frame[:] = (20, 20, 20)
+
+def update(x, y):
+    line = 16
+    frame[:] = (20, 20, 20)
+    font = cv2.FONT_HERSHEY_PLAIN
+    txtcolor = (255, 255, 255)
+    index = image[y][x]
+    if index == 0:
+        pass
+    else:
+        cv2.putText(frame, 'Hovering over: ' + names[index], (10, line), font, 1, txtcolor, 1, cv2.CV_AA)
+        pos = shapes.index([p for p in shapes if p[0] == index][0])
+        ctr = "X: " + str(shapes[pos][3][0]) + ", Y: " + str(shapes[pos][3][1])
+        cv2.putText(frame, 'Center of mass: ' + ctr, (10, line*2), font, 1, txtcolor, 1, cv2.CV_AA)
+        cv2.putText(frame, 'Area: ' + str(shapes[pos][2]), (10, line*3), font, 1, txtcolor, 1, cv2.CV_AA)
+        mbru = "Upper left X: " + str(shapes[pos][1][0]) + " Y: " + str(shapes[pos][1][1])
+        mbrl = "Lower right X: " + str(shapes[pos][1][0] + shapes[pos][1][2]) + " Y: " + str(shapes[pos][1][1] + shapes[pos][1][3])
+        cv2.putText(frame, 'Minimum bounding rectangle: ', (10, line*4), font, 1, txtcolor, 1, cv2.CV_AA)
+        cv2.putText(frame, mbru, (30, line*5), font, 1, txtcolor, 1, cv2.CV_AA)
+        cv2.putText(frame, mbrl, (30, line*6), font, 1, txtcolor, 1, cv2.CV_AA)
+
+        i = 10
+        cv2.putText(frame, "Building characteristics: ", (10, line*9), font, 1, txtcolor, 1, cv2.CV_AA)
+        for item in [p for p in charact if p[0] == index]:
+            cv2.putText(frame, item[1], (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
+            i += 1
+    cv2.imshow("information", frame)
+
+def onmouse(event, x, y, flags, param):
+    global seed_pt
+    seed_pt = x, y
+    time.sleep(0.01)
+    update(x-1, y-1)
+
+cv2.setMouseCallback("campus", onmouse)
+cv2.imshow("information", frame)
+cv2.moveWindow("information", 50, 50)
+cv2.moveWindow("campus", 765, 50)
+
+cv2.waitKey(0)
