@@ -418,20 +418,19 @@ def spatialrelation(ptS, ptT):
 # Calculates the minimal distance between two shapes
 def shapedistance(shapeS, shapeT):
     maxDist = 0;
-    for i in shapeS:
-        minB = float("inf")
-        for j in shapeT[::4]:
+    for i in shapeS[5][::4]:
+        min = float("inf")
+        for j in shapeT[5][::4]:
             dx = (i[0][0] - j[0][0])
             dy = (i[0][1] - j[0][1])
             tmpDist = math.hypot(dx, dy)
-            if tmpDist < minB:
-                minB = tmpDist
+            if tmpDist < min:
+                min = tmpDist
             if tmpDist == 0:
                 break  # You can't get a closer distance than 0
-    # Looking at the map, I reckon 200 pixels distance is a good measure to separate what is "near" and "far"
-    # Yes, this is overfitting, but without knowing the map scale there aren't many choices to make the decision
-    # more sophisticated
-    if minB < 200:
+    # I believe a threshold of sqrt(area)*3 is as good approximation as any to what constitutes "near" and "far"
+    threshold = math.sqrt(shapeS[2]) * 3
+    if min < threshold:
         return True
     else:
         return False
@@ -448,7 +447,7 @@ for shape in shapes:
         # no point comparing a building to itself...
         if shape == i:
             continue
-        print names[shape[0]] + " -> " + names[i[0]]
+        #print names[shape[0]] + " -> " + names[i[0]]
         result = spatialrelation(shape[3], i[3])
         #print result
         if result == "N":
@@ -459,7 +458,25 @@ for shape in shapes:
             relationsE.append([shape[0], i[0], True])
         if result == "W":
             relationsW.append([shape[0], i[0], True])
-        relationsD.append([shape[0], i[0], shapedistance(shape[5], i[5])])
+        result = shapedistance(shape, i)
+        if result:
+            relationsD.append([shape[0], i[0], result])
+
+
+def transitivefiltering(relations):
+    for i in relations:
+        for j in relations:
+            for k in relations:
+                if i[1] == j[0] and i[0] == k[0] and j[1] == k[1] and (i[2] == j[2] == k[2]):
+                    relations.pop(relations.index(k))
+    return relations
+
+# And now we filter the relations
+#print len(relationsN) + len(relationsS) + len(relationsW) + len(relationsE)
+relationsN = transitivefiltering(relationsN)
+relationsS = transitivefiltering(relationsS)
+relationsE = transitivefiltering(relationsE)
+relationsW = transitivefiltering(relationsW)
 
 
 # User interface code
