@@ -78,7 +78,7 @@ def squarest(shapes):
     building = 0
     for shape in shapes:
         # We only care about buildings that approach a rectangle
-        if shape[4] != 0:
+        if shape[4]:
             ma = float(max(shape[1][2], shape[1][3]))
             mi = float(min(shape[1][2], shape[1][3]))
             # The squarest building is the one with smallest ratio height/width
@@ -94,7 +94,7 @@ def mostrectangular(shapes):
     building = 0
     for shape in shapes:
         # We only care about buildings that approach a rectangle
-        if shape[4] != 0:
+        if shape[4]:
             ma = float(max(shape[1][2], shape[1][3]))
             mi = float(min(shape[1][2], shape[1][3]))
             # The most rectangular building is the one with largest ratio height/width
@@ -226,6 +226,21 @@ def geoposition(c):
         return None
 
 
+# Here we decide whether the shape is oriented north-south or east-west
+def orientation(dimen):
+    l = float(max(dimen[0], dimen[1]))
+    s = float(min(dimen[0], dimen[1]))
+    # I reckon that if the reason between the largest dimension and the smallest dimension is smaller than
+    # 1.25, that shape is too close to a square for the orientation to be visually meaningful
+    if l / s < 1.25:
+        return None
+    else:
+        if dimen[0] > dimen[1]:
+            return "Oriented east-west (horizontal)"
+        else:
+            return "Oriented north-south (vertical)"
+
+
 # Here we cluster areas to decide which shapes are "small", "medium" and "large"
 def areaclust(shapes):
     # Start by creating an array with areas. To suit kmeans' finnicky rules, we must reshape the array into
@@ -254,12 +269,13 @@ def areaclust(shapes):
 # Here we detect whether the shape is "quadrilateral-ish", that is, approaches a rectangle;
 # or if it contains substantial negative space in the mbr
 def quadrilateral(mbr, shape):
-    flag = 0
+    flag = False
     area_shape = cv2.contourArea(shape)
-    area_mbr = mbr[2] * mbr[3]
+    # Remove one pixel from each dimension of the bounding rectangle to make it "snug"
+    area_mbr = (mbr[0]-1) * (mbr[1]-1)
     # I decided on values of 1.25 and lower for the areas ratio as a good approximation for a rectangular shape
-    if ( area_mbr / area_shape ) < 1.26:
-        flag = 1
+    if (area_mbr / area_shape) <= 1.25:
+        flag = True
     return flag
 
 
@@ -272,7 +288,10 @@ for shape in contours[0]:
     # Here we obtain the minimum bounding rectangle
     x, y, w, h = cv2.boundingRect(shape)
 
-    quadr = quadrilateral((x, y, w, h), shape)
+    print names[color]
+    quadr = quadrilateral((w, h), shape)
+    if quadr:
+        charact.append([color, orientation((w, h))])
 
     # Here we find the area of the shape
     area = int(cv2.contourArea(shape))
@@ -314,8 +333,8 @@ charact.append([longest(shapes), "longest building"])
 charact.append([thinnest(shapes), "thinnest building"])
 areaclust(shapes)
 
-for character in charact:
-    print names[character[0]] + ": " + character[1]
+#for character in charact:
+#    print names[character[0]] + ": " + character[1]
 
 #cv2.imshow('campus', image)
 #cv2.waitKey(0)
