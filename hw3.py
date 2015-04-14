@@ -15,13 +15,13 @@ contours = cv2.findContours(image.copy(), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPRO
 try:
     with open("ass3-table.txt", 'rb') as f:
         buildings = f.readlines()
+    f.close()
 except IOError:
     print "ERROR: The file containing building names can not be read"
     exit()
-f.close()
 # We create an array "names" that can associate building names with their index colors
 names = []
-names.append("null")
+names.append("None")
 for line in buildings:
     line = line.rstrip('\r\n')
     toks = line.split('=')
@@ -154,6 +154,78 @@ def thinnest(shapes):
     return building
 
 
+# Here we decide whether a building is I-shaped or C-shaped
+def lettershape(shape):
+    # Method that returns the amount of sides in the shape polygon
+    poly = cv2.approxPolyDP(shape, 0.009*cv2.arcLength(shape, True), True)
+    hull = cv2.convexHull(shape, returnPoints=False)
+    defects = cv2.convexityDefects(shape, hull)
+    point = 0
+    try:
+        for point in range(defects.shape[0]):
+            pass
+        point += 1
+    except:
+        point = 0
+    # If the shape has 12 sides and two convexity points, it looks like an I
+    if point == 2 and len(poly) == 12:
+        return "I-shaped building"
+    # If the shape has eight sides and one convexity point, it looks like a C
+    if point == 1 and len(poly) == 8:
+        return "C-shaped building"
+    else:
+        return None
+
+
+# Here we decide whether a building has "chewed" corners
+def corners(shape):
+    # Method that returns the amount of sides in the shape polygon
+    poly = cv2.approxPolyDP(shape, 0.009*cv2.arcLength(shape, True), True)
+    hull = cv2.convexHull(shape, returnPoints=False)
+    defects = cv2.convexityDefects(shape, hull)
+    point = 0
+    try:
+        for point in range(defects.shape[0]):
+            pass
+        point += 1
+    except:
+        point = 0
+    # If the shape has 12 or 16 sides and 4 convexity points, it has "chewed corners"
+    if point == 4 and (len(poly) == 12 or len(poly) == 16):
+        return "'Chewed' corners building"
+    else:
+        return None
+
+
+# Figures the geographical position of the building within the campus
+def geoposition(c):
+    # First we divide the map dimensions in thirds
+    width = len(image)
+    height = len(image[0])
+    ythird = width / 3
+    xthird = height / 3
+    if c[0] < xthird and c[1] < ythird:
+        return "Building position: northwest"
+    elif c[0] > xthird and c[0] < xthird*2 and c[1] < ythird:
+        return "Building position: north"
+    elif c[0] > xthird*2 and c[1] < ythird:
+        return "Building position: northeast"
+    elif c[0] < xthird and c[1] > ythird and c[1] < ythird*2:
+        return "Building position: west"
+    elif c[0] > xthird and c[0] < xthird*2 and c[1] > ythird and c[1] < ythird*2:
+        return "Building position: center"
+    elif c[0] > xthird*2 and c[1] > ythird and c[1] < ythird*2:
+        return "Building position: east"
+    elif c[0] < xthird and c[1] > ythird*2:
+        return "Building position: southwest"
+    elif c[0] > xthird and c[0] < xthird*2 and c[1] > ythird*2:
+        return "Building position: south"
+    elif c[0] > xthird*2 and c[1] < ythird*2:
+        return "Building position: southeast"
+    else:
+        return None
+
+
 # Here we cluster areas to decide which shapes are "small", "medium" and "large"
 def areaclust(shapes):
     # Start by creating an array with areas. To suit kmeans' finnicky rules, we must reshape the array into
@@ -193,29 +265,42 @@ def quadrilateral(mbr, shape):
 
 shapes = []
 # Here we analyze each shape individually, obtaining basic information such as area and MBR
-for array in contours[0]:
+for shape in contours[0]:
     # Here we get the color (index):
-    color = image[array[0][0][1]][array[0][0][0]]
+    color = image[shape[0][0][1]][shape[0][0][0]]
 
     # Here we obtain the minimum bounding rectangle
-    x, y, w, h = cv2.boundingRect(array)
+    x, y, w, h = cv2.boundingRect(shape)
 
-    quadr = quadrilateral((x, y, w, h), array)
+    quadr = quadrilateral((x, y, w, h), shape)
 
     # Here we find the area of the shape
-    area = int(cv2.contourArea(array))
+    area = int(cv2.contourArea(shape))
 
     # And here the center of mass
-    moments = cv2.moments(array)
+    moments = cv2.moments(shape)
     if moments['m00'] != 0:
         cx = int(moments['m10']/moments['m00'])  # cx = M10/M00
         cy = int(moments['m01']/moments['m00'])  # cy = M01/M00
     center = (cx, cy)
 
+    letter = lettershape(shape)
+    if letter:
+        charact.append([color, letter])
+        charact.append([color, "Sharp corners building"])
+    corn = corners(shape)
+    if corn:
+        charact.append([color, corn])
+
+    position = geoposition(center)
+    if position:
+        charact.append([color, position])
+
     # All values are added to an array that will be used elsewhere in the program
     shapes.append([color, (x, y, w, h), area, center, quadr])
 
-    #cv2.circle(image, center, 3, 128, 1)
+
+    #cv2.circle(image, center, 3, 128, -1)
 
 charact.append([northernmost(shapes), "northernmost building"])
 charact.append([southernmost(shapes), "southernmost building"])
