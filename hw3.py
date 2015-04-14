@@ -2,7 +2,7 @@
 # Roberto Amorim - rja2139
 
 import cv2, cv
-import time
+import time, math
 import numpy as np
 
 # Array that holds characteristics for the campus buildings
@@ -354,20 +354,21 @@ for shape in contours[0]:
         cy = int(moments['m01']/moments['m00'])  # cy = M01/M00
     center = (cx, cy)
 
+    # Does it look like a letter?
     letter = lettershape(shape)
     if letter:
         charact.append([color, letter])
         charact.append([color, "Sharp corners building"])
-    corn = corners(shape)
-    if corn:
-        charact.append([color, corn])
+    corner = corners(shape)
+    if corner:
+        charact.append([color, corner])
 
     position = geoposition(center)
     if position:
         charact.append([color, position])
 
     # All values are added to an array that will be used elsewhere in the program
-    shapes.append([color, (x, y, w, h), area, center, quadr])
+    shapes.append([color, (x, y, w, h), area, center, quadr, shape])
 
     #cv2.circle(image, center, 3, 128, -1)
 
@@ -384,11 +385,89 @@ charact.append([thinnest(shapes), "thinnest building"])
 areaclust(shapes)
 
 
+# Evaluates building spacial relations relations based on angle between each building's center of mass
+def spatialrelation(ptS, ptT):
+    # Calculate the angle between a vertical line passing through the source and a line from source to target
+    a = np.array([ptS[0]+10, ptS[1]])
+    b = np.array([ptS[0], ptS[1]])
+    c = np.array([ptT[0], ptT[1]])
+    ba = a - b
+    bc = b - c
+    s = np.arctan2(*ba)
+    if s < 0:
+        s += 2 * np.pi
+    e = np.arctan2(*bc)
+    if e < 0:
+        e += 2 * np.pi
+    delta = e - s
+    deg = np.rad2deg(delta)
+    # I reckon that an angle of 45 to 135 degrees from the first building can be safely considered north, visually
+    if 45  < deg <= 135:
+        return "N"
+    # And so forth for all other cardinal points
+    if 135 < deg <= 225:
+        return "W"
+    if 225 < deg <= 315:
+        return "S"
+    if deg <= 45 or deg > 315:
+        return "E"
+    else:
+        return False
+
+
+# Calculates the minimal distance between two shapes
+def shapedistance(shapeS, shapeT):
+    maxDist = 0;
+    for i in shapeS:
+        minB = float("inf")
+        for j in shapeT[::4]:
+            dx = (i[0][0] - j[0][0])
+            dy = (i[0][1] - j[0][1])
+            tmpDist = math.hypot(dx, dy)
+            if tmpDist < minB:
+                minB = tmpDist
+            if tmpDist == 0:
+                break  # You can't get a closer distance than 0
+    # Looking at the map, I reckon 200 pixels distance is a good measure to separate what is "near" and "far"
+    # Yes, this is overfitting, but without knowing the map scale there aren't many choices to make the decision
+    # more sophisticated
+    if minB < 200:
+        return True
+    else:
+        return False
+
+
+relationsN = []
+relationsS = []
+relationsE = []
+relationsW = []
+relationsD = []
+# Here I evaluate spatial relations between buildings
+for shape in shapes:
+    for i in shapes:
+        # no point comparing a building to itself...
+        if shape == i:
+            continue
+        print names[shape[0]] + " -> " + names[i[0]]
+        result = spatialrelation(shape[3], i[3])
+        #print result
+        if result == "N":
+            relationsN.append([shape[0], i[0], True])
+        if result == "S":
+            relationsS.append([shape[0], i[0], True])
+        if result == "E":
+            relationsE.append([shape[0], i[0], True])
+        if result == "W":
+            relationsW.append([shape[0], i[0], True])
+        relationsD.append([shape[0], i[0], shapedistance(shape[5], i[5])])
+
+
 # User interface code
 cv2.imshow('campus', display)
 
 frame = np.zeros((495, 700, 3), np.uint8)
 frame[:] = (20, 20, 20)
+
 
 def update(x, y):
     line = 16
@@ -397,8 +476,10 @@ def update(x, y):
     txtcolor = (255, 255, 255)
     index = image[y][x]
     if index == 0:
+        # Print nothing if the mouse is hovering over the empty spaces
         pass
     else:
+        # Print the building characteristics when the mouse is over one
         cv2.putText(frame, 'Hovering over: ' + names[index], (10, line), font, 1, txtcolor, 1, cv2.CV_AA)
         pos = shapes.index([p for p in shapes if p[0] == index][0])
         ctr = "X: " + str(shapes[pos][3][0]) + ", Y: " + str(shapes[pos][3][1])
@@ -410,18 +491,22 @@ def update(x, y):
         cv2.putText(frame, mbru, (30, line*5), font, 1, txtcolor, 1, cv2.CV_AA)
         cv2.putText(frame, mbrl, (30, line*6), font, 1, txtcolor, 1, cv2.CV_AA)
 
-        i = 10
         cv2.putText(frame, "Building characteristics: ", (10, line*9), font, 1, txtcolor, 1, cv2.CV_AA)
+        i = 10
         for item in [p for p in charact if p[0] == index]:
             cv2.putText(frame, item[1], (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
             i += 1
     cv2.imshow("information", frame)
+
 
 def onmouse(event, x, y, flags, param):
     global seed_pt
     seed_pt = x, y
     time.sleep(0.01)
     update(x-1, y-1)
+    #if flags & cv2.EVENT_FLAG_LBUTTON:
+    #    seed_pt = x, y
+    #    update()
 
 cv2.setMouseCallback("campus", onmouse)
 cv2.imshow("information", frame)
