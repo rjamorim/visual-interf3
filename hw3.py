@@ -12,6 +12,8 @@ image = cv2.imread("ass3-labeled.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
 display = cv2.imread("ass3-campus.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
 contours = cv2.findContours(image.copy(), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_NONE)
 
+print len(image)
+
 # Here we open the building names table
 try:
     with open("ass3-table.txt", 'rb') as f:
@@ -370,7 +372,6 @@ for shape in contours[0]:
     # All values are added to an array that will be used elsewhere in the program
     shapes.append([color, (x, y, w, h), area, center, quadr, shape])
 
-    #cv2.circle(image, center, 3, 128, -1)
 
 charact.append([northernmost(shapes), "northernmost building"])
 charact.append([southernmost(shapes), "southernmost building"])
@@ -416,11 +417,10 @@ def spatialrelation(ptS, ptT):
 
 
 # Calculates the minimal distance between two shapes
-def shapedistance(shapeS, shapeT):
-    maxDist = 0;
-    for i in shapeS[5][::4]:
+def shapedistance(shapeS, shapeT, area):
+    for i in shapeS[::4]:
         min = float("inf")
-        for j in shapeT[5][::4]:
+        for j in shapeT[::4]:
             dx = (i[0][0] - j[0][0])
             dy = (i[0][1] - j[0][1])
             tmpDist = math.hypot(dx, dy)
@@ -429,7 +429,7 @@ def shapedistance(shapeS, shapeT):
             if tmpDist == 0:
                 break  # You can't get a closer distance than 0
     # I believe a threshold of sqrt(area)*3 is as good approximation as any to what constitutes "near" and "far"
-    threshold = math.sqrt(shapeS[2]) * 3
+    threshold = math.sqrt(area) * 3
     if min < threshold:
         return True
     else:
@@ -458,7 +458,7 @@ for shape in shapes:
             relationsE.append([shape[0], i[0], True])
         if result == "W":
             relationsW.append([shape[0], i[0], True])
-        result = shapedistance(shape, i)
+        result = shapedistance(shape[5], i[5], shape[2])
         if result:
             relationsD.append([shape[0], i[0], result])
 
@@ -472,16 +472,16 @@ def transitivefiltering(relations):
     return relations
 
 # And now we filter the relations
-#print len(relationsN) + len(relationsS) + len(relationsW) + len(relationsE)
+print len(relationsN) + len(relationsS) + len(relationsW) + len(relationsE) + len(relationsD)
 relationsN = transitivefiltering(relationsN)
 relationsS = transitivefiltering(relationsS)
 relationsE = transitivefiltering(relationsE)
 relationsW = transitivefiltering(relationsW)
-
+relationsD = transitivefiltering(relationsD)
+print len(relationsN) + len(relationsS) + len(relationsW) + len(relationsE) + len(relationsD)
 
 # User interface code
 cv2.imshow('campus', display)
-
 frame = np.zeros((495, 700, 3), np.uint8)
 frame[:] = (20, 20, 20)
 
@@ -494,7 +494,7 @@ def update(x, y):
     index = image[y][x]
     if index == 0:
         # Print nothing if the mouse is hovering over the empty spaces
-        pass
+        cv2.putText(frame, 'Mouse pos: ' + str(x) + ", " + str(y), (500, line*30), font, 1, txtcolor, 1, cv2.CV_AA)
     else:
         # Print the building characteristics when the mouse is over one
         cv2.putText(frame, 'Hovering over: ' + names[index], (10, line), font, 1, txtcolor, 1, cv2.CV_AA)
@@ -513,17 +513,69 @@ def update(x, y):
         for item in [p for p in charact if p[0] == index]:
             cv2.putText(frame, item[1], (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
             i += 1
+        cv2.putText(frame, 'Mouse pos: ' + str(x) + ", " + str(y), (500, line*30), font, 1, txtcolor, 1, cv2.CV_AA)
     cv2.imshow("information", frame)
 
 
+def pointdistance(point, shape):
+    min = float("inf")
+    for j in shape[::4]:
+        dx = (point[0] - j[0][0])
+        dy = (point[1] - j[0][1])
+        tmpDist = math.hypot(dx, dy)
+        if tmpDist < min:
+            min = tmpDist
+        if tmpDist == 0:
+            break  # You can't get a closer distance than 0
+    # Here the distance threshold is even more arbitrary. I for now am considering it to be "100 pixels"
+    threshold = 100
+    if min < threshold:
+        return True
+    else:
+        return False
+
+
+pixelattrib = []
+cloudpixels = []
+def computecloud(x, y):
+    # Here we compute the descriptions for the point we are studying
+    pointattrib = []
+    for shape in shapes:
+        pointattrib.append([spatialrelation((x, y), shape[3]), pointdistance([x, y], shape[5])])
+    if pointattrib == pixelattrib:
+        if display[y][x] == 0 or display[y][x] == 255:
+            cloudpixels.append([x, y])
+            display[y][x] = 128
+            if x > 0:
+                computecloud(x-1, y)
+            if x < len(image[y]) - 1:
+                computecloud(x+1, y)
+            if y > 0:
+                computecloud(x, y-1)
+            if y < len(image) - 1:
+                computecloud(x, y+1)
+        else:
+            return
+    cv2.imshow('campus', display)
+
+
+def cloud(x, y):
+    global cloudpixels
+    cloudpixels = []
+    global pixelattrib
+    pixelattrib = []
+    for shape in shapes:
+        pixelattrib.append([spatialrelation((x, y), shape[3]), pointdistance([x, y], shape[5])])
+    computecloud(x, y)
+    print len(cloudpixels)
+
+
 def onmouse(event, x, y, flags, param):
-    global seed_pt
-    seed_pt = x, y
     time.sleep(0.01)
     update(x-1, y-1)
-    #if flags & cv2.EVENT_FLAG_LBUTTON:
-    #    seed_pt = x, y
-    #    update()
+    if flags & cv2.EVENT_FLAG_LBUTTON:
+        print "click!" + str(x) + ", " + str(y)
+        cloud(x, y)
 
 cv2.setMouseCallback("campus", onmouse)
 cv2.imshow("information", frame)
