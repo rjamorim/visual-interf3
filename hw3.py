@@ -381,6 +381,17 @@ charact.append([longest(shapes), "longest building"])
 charact.append([thinnest(shapes), "thinnest building"])
 areaclust(shapes)
 
+'''
+shapes.reverse()
+for shape in shapes:
+    print names[shape[0]] + " characteristics: "
+    print "Center of mass: " + str(shape[3])
+    print "Area: " + str(shape[2])
+    print "MBR coordinates: " + str(shape[1][0]) + ", " + str(shape[1][1]) + " - " + str(shape[1][0] + shape[1][2]) + ", " + str(shape[1][1] + shape[1][3])
+    for item in [p for p in charact if p[0] == shape[0]]:
+        print item[1]
+    print " "
+'''
 
 # Evaluates building spacial relations relations based on angle between each building's center of mass
 def spatialrelation(ptS, ptT):
@@ -466,19 +477,16 @@ def transitivefiltering(relations):
     return relations
 
 # And now we filter the relations
-print len(relationsN) + len(relationsS) + len(relationsW) + len(relationsE) + len(relationsD)
 relationsN = transitivefiltering(relationsN)
 relationsS = transitivefiltering(relationsS)
 relationsE = transitivefiltering(relationsE)
 relationsW = transitivefiltering(relationsW)
 relationsD = transitivefiltering(relationsD)
-print len(relationsN) + len(relationsS) + len(relationsW) + len(relationsE) + len(relationsD)
 
 # User interface code
 cv2.imshow('campus', display)
 frame = np.zeros((495, 700, 3), np.uint8)
 frame[:] = (20, 20, 20)
-
 
 def update(x, y):
     line = 16
@@ -487,7 +495,7 @@ def update(x, y):
     txtcolor = (255, 255, 255)
     index = image[y][x]
     if index == 0:
-        # Print nothing if the mouse is hovering over the empty spaces
+        # Print only mouse position if the mouse is hovering over the empty spaces
         cv2.putText(frame, 'Mouse pos: ' + str(x) + ", " + str(y), (500, line*30), font, 1, txtcolor, 1, cv2.CV_AA)
     else:
         # Print the building characteristics when the mouse is over one
@@ -507,7 +515,31 @@ def update(x, y):
         for item in [p for p in charact if p[0] == index]:
             cv2.putText(frame, item[1], (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
             i += 1
-        cv2.putText(frame, 'Mouse pos: ' + str(x) + ", " + str(y), (500, line*30), font, 1, txtcolor, 1, cv2.CV_AA)
+        i += 2
+
+        cv2.putText(frame, "Building relations: ", (10, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
+        for item in [p for p in relationsN if p[0] == index]:
+            i += 1
+            relation = "located north of " + names[item[1]]
+            cv2.putText(frame, relation, (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
+        for item in [p for p in relationsS if p[0] == index]:
+            i += 1
+            relation = "located south of " + names[item[1]]
+            cv2.putText(frame, relation, (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
+        for item in [p for p in relationsE if p[0] == index]:
+            i += 1
+            relation = "located east of " + names[item[1]]
+            cv2.putText(frame, relation, (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
+        for item in [p for p in relationsW if p[0] == index]:
+            i += 1
+            relation = "located west of " + names[item[1]]
+            cv2.putText(frame, relation, (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
+        for item in [p for p in relationsD if p[0] == index]:
+            i += 1
+            relation = "near " + names[item[1]]
+            cv2.putText(frame, relation, (30, line*i), font, 1, txtcolor, 1, cv2.CV_AA)
+
+        #cv2.putText(frame, 'Mouse pos: ' + str(x) + ", " + str(y), (500, line*30), font, 1, txtcolor, 1, cv2.CV_AA)
     cv2.imshow("information", frame)
 
 
@@ -527,7 +559,6 @@ def pointdistance(point, shape):
         return True
     else:
         return False
-
 
 pixelattrib = []
 cloudpixels = []
@@ -551,6 +582,7 @@ def computecloud(x, y):
         else:
             return
     cv2.imshow('campus', display)
+    cv2.imwrite("campus.png", display)
 
 
 def cloud(x, y):
@@ -558,8 +590,20 @@ def cloud(x, y):
     cloudpixels = []
     global pixelattrib
     pixelattrib = []
+    print "X: " + str(x) + ", Y: " + str(y)
     for shape in shapes:
-        pixelattrib.append([spatialrelation((x, y), shape[3]), pointdistance([x, y], shape[5])])
+        result = [spatialrelation((x, y), shape[3]), pointdistance([x, y], shape[5])]
+        pixelattrib.append(result)
+        if result[0] == "N":
+            print "North of " + names[shape[0]]
+        if result[0] == "S":
+            print "South of " + names[shape[0]]
+        if result[0] == "E":
+            print "East of " + names[shape[0]]
+        if result[0] == "W":
+            print "West of " + names[shape[0]]
+        if result[1] == True:
+            print "Near " + names[shape[0]]
     computecloud(x, y)
     print len(cloudpixels)
 
@@ -568,7 +612,6 @@ def onmouse(event, x, y, flags, param):
     time.sleep(0.01)
     update(x-1, y-1)
     if flags & cv2.EVENT_FLAG_LBUTTON:
-        print "click!" + str(x) + ", " + str(y)
         cloud(x, y)
 
 cv2.setMouseCallback("campus", onmouse)
