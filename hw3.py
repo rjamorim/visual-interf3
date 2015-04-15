@@ -11,9 +11,6 @@ charact = []
 image = cv2.imread("ass3-labeled.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
 display = cv2.imread("ass3-campus.pgm", cv.CV_LOAD_IMAGE_UNCHANGED)
 contours = cv2.findContours(image.copy(), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_NONE)
-
-print len(image)
-
 # Here we open the building names table
 try:
     with open("ass3-table.txt", 'rb') as f:
@@ -197,7 +194,7 @@ def corners(shape):
         point = 0
     # If the shape has 12 or 16 sides and 4 convexity points, it has "chewed corners"
     if point == 4 and (len(poly) == 12 or len(poly) == 16):
-        return "'Chewed' corners building"
+        return "'chewed' corners building"
     else:
         return None
 
@@ -278,13 +275,13 @@ def hsymmetry(roi):
         sndhalf = roi[len(roi)/2:, :]
         cv2.flip(sndhalf.copy(), 0, sndhalf)
         if fsthalf.__eq__(sndhalf).all():
-            return "horizontally simmetrical"
+            return "horizontally symmetrical"
     else:
         fsthalf = roi[0:len(roi)/2, :]
         sndhalf = roi[(len(roi)/2)+1:, :]
         cv2.flip(sndhalf.copy(), 0, sndhalf)
         if fsthalf.__eq__(sndhalf).all():
-            return "horizontally simmetrical"
+            return "horizontally symmetrical"
     return None
 
 
@@ -295,13 +292,13 @@ def vsymmetry(roi):
         sndhalf = roi[:, len(roi[0])/2:]
         cv2.flip(sndhalf.copy(), 1, sndhalf)
         if fsthalf.__eq__(sndhalf).all():
-            return "vertically simmetrical"
+            return "vertically symmetrical"
     else:
         fsthalf = roi[:, 0:len(roi[0])/2]
         sndhalf = roi[:, (len(roi[0])/2)+1:]
         cv2.flip(sndhalf.copy(), 1, sndhalf)
         if fsthalf.__eq__(sndhalf).all():
-            return "vertically simmetrical"
+            return "vertically symmetrical"
     return None
 
 
@@ -323,7 +320,6 @@ shapes = []
 for shape in contours[0]:
     # Here we get the color (index):
     color = image[shape[0][0][1]][shape[0][0][0]]
-    #print "== " + names[color]
 
     # Here we obtain the minimum bounding rectangle
     x, y, w, h = cv2.boundingRect(shape)
@@ -360,7 +356,7 @@ for shape in contours[0]:
     letter = lettershape(shape)
     if letter:
         charact.append([color, letter])
-        charact.append([color, "Sharp corners building"])
+        charact.append([color, "sharp corners building"])
     corner = corners(shape)
     if corner:
         charact.append([color, corner])
@@ -447,9 +443,7 @@ for shape in shapes:
         # no point comparing a building to itself...
         if shape == i:
             continue
-        #print names[shape[0]] + " -> " + names[i[0]]
         result = spatialrelation(shape[3], i[3])
-        #print result
         if result == "N":
             relationsN.append([shape[0], i[0], True])
         if result == "S":
